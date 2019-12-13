@@ -142,9 +142,28 @@ is_visible(_Method, Metadata) ->
 swagger_paths([], Acc) ->
   Acc;
 swagger_paths([Trail | T], Acc) ->
+  {RemainingMetadata, NewAcc} = swagger_custom_paths(Trail, Acc),
   Path = normalize_path(trails:path_match(Trail)),
-  Metadata = normalize_map_values(validate_metadata(trails:metadata(Trail))),
-  swagger_paths(T, maps:put(Path, Metadata, Acc)).
+  Metadata = normalize_map_values(validate_metadata(RemainingMetadata)),
+  swagger_paths(T, maps:put(Path, Metadata, NewAcc)).
+
+swagger_custom_paths(Trail, Acc) ->
+  Metadata = trails:metadata(Trail),
+  case maps:get(paths, Metadata, undefined) of
+    undefined ->
+      {Metadata, Acc};
+    Paths ->
+      NewAcc =
+        maps:fold(
+          fun(Path, Meta0, AccIn) ->
+              Meta = normalize_map_values(validate_metadata(Meta0)),
+              maps:put(Path, Meta, AccIn)
+          end,
+          Acc,
+          Paths),
+      RemainingMetadata = maps:remove(paths, Metadata),
+      {RemainingMetadata, NewAcc}
+  end.
 
 %% @private
 normalize_path(Path) ->
